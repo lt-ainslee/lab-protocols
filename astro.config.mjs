@@ -2,6 +2,10 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+// 预览版：手动设置 SITE_ENV=preview，或在 Cloudflare Workers Builds 中构建非 main 分支
+const branch = process.env.WORKERS_CI_BRANCH;
+const isPreview = process.env.SITE_ENV === 'preview' || (branch !== undefined && branch !== 'main');
+
 export default defineConfig({
   integrations: [
     starlight({
@@ -31,6 +35,16 @@ export default defineConfig({
         { label: '模板', items: [{ autogenerate: { directory: 'guide' } }] },
       ],
       lastUpdated: false,
+      components: {
+        Banner: './src/components/Banner.astro',
+      },
+      head: isPreview ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' } }] : [],
     }),
   ],
+  vite: {
+    define: {
+      __PREVIEW__: JSON.stringify(isPreview),
+      __BRANCH__: JSON.stringify(branch ?? ''),
+    },
+  },
 });

@@ -39,20 +39,33 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 ## 部署到 Cloudflare
 
+| 分支 | 用途 | 网址 |
+|---|---|---|
+| `main` | 正式版 | `lab-protocols.<子域>.workers.dev` |
+| `experimental` | 实验预览版 | `experimental-lab-protocols.<子域>.workers.dev` |
+
+预览版页面顶部会显示“实验预览版”提示条，并设置 `noindex` 禁止搜索引擎收录。
+判断逻辑在 `astro.config.mjs`：Cloudflare 构建非 `main` 分支（`WORKERS_CI_BRANCH`），或手动设置 `SITE_ENV=preview` 时，即为预览版。
+
 **方式一：Git 自动部署（推荐）**
 
-在 Cloudflare 控制台 Workers & Pages → 创建 → 导入 Git 仓库，选择本仓库：
+在 Cloudflare 控制台 Workers & Pages → 创建 → 导入 Git 仓库，选择本仓库，然后在 Settings → Builds 中设置：
 
+- 生产分支：`main`
 - 构建命令：`npm run build`
 - 部署命令：`npx wrangler deploy`
+- Branch control 中勾选 Enable Preview Builds
+- Preview 命令：`npx wrangler preview`（默认值）
 
-推送到 `main` 后自动部署，其他分支会生成预览网址。
+预览使用 Cloudflare 的 [Worker Previews](https://developers.cloudflare.com/workers/previews/)，预览名默认取分支名，因此 `experimental` 分支的预览网址固定为 `experimental-lab-protocols.<子域>.workers.dev`。
+`wrangler preview` 要求 `wrangler.jsonc` 中存在 `previews` 配置块（可以为空），请勿删除。
 
 **方式二：本地命令部署**
 
 ```bash
 npx wrangler login
-npm run deploy
+npm run deploy           # 正式版
+npm run deploy:preview   # 实验预览版
 ```
 
 ## 样式

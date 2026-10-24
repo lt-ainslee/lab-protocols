@@ -1,0 +1,38 @@
+---
+import Default from '@astrojs/starlight/components/Banner.astro';
+---
+
+{
+  __PREVIEW__ && (
+    <div class="preview-banner" role="note">
+      <strong>实验预览版</strong>
+      <span>内容尚未审核，可能随时变动，请勿用于实际操作。</span>
+      {__BRANCH__ && <code>{__BRANCH__}</code>}
+    </div>
+  )
+}
+<Default />
+
+<style>
+  .preview-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    margin-bottom: 1.5rem;
+    padding: 0.6rem 1rem;
+    border-inline-start: 2px solid #e8a317;
+    background: var(--panel);
+    font-family: var(--sans);
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-2);
+  }
+  .preview-banner strong {
+    color: var(--sl-color-white);
+  }
+  .preview-banner code {
+    margin-inline-start: auto;
+    font-size: 0.85em;
+    color: var(--sl-color-gray-3);
+  }
+</style>
