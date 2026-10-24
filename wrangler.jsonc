@@ -5,5 +5,10 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page"
-  }
+  },
+  // 正式版：lab-protocols.<子域>.workers.dev
+  "workers_dev": true,
+  // 预览版：每次 versions upload 生成独立网址；
+  // 实验分支使用固定别名 experimental-lab-protocols.<子域>.workers.dev
+  "preview_urls": true
 }
