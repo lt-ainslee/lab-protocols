@@ -1,1 +1,4 @@
-site/
+node_modules/
+dist/
+.astro/
+.wrangler/
