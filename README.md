@@ -52,7 +52,7 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 在 Cloudflare 控制台 Workers & Pages → 创建 → 导入 Git 仓库，选择本仓库，然后在 Settings → Build 中设置：
 
 - 生产分支：`main`
-- 构建命令：`npm run build`
+- 构建命令：留空即可（`wrangler.jsonc` 中已配置 `build.command`，部署前会自动构建）
 - 部署命令：`npx wrangler deploy`
 - 启用非生产分支构建，分支筛选只包含 `experimental`
 - 非生产分支部署命令：`npx wrangler versions upload --preview-alias experimental`
