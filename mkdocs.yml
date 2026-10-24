@@ -8,23 +8,32 @@ theme:
     - navigation.sections
     - navigation.top
     - search.highlight
+    - navigation.footer
     - content.tabs.link
     - content.code.copy
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-night
         name: 切换到深色模式
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: teal
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-sunny
         name: 切换到浅色模式
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    logo: material/flask-outline
+
+extra_css:
+  - stylesheets/extra.css
 
 plugins:
   - search:

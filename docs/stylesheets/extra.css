@@ -1,0 +1,187 @@
+/* 白色极简主题 */
+
+:root {
+  --md-text-font-family: var(--md-text-font, _), "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #ffffff;
+  --md-primary-fg-color--light: #ffffff;
+  --md-primary-fg-color--dark: #ffffff;
+  --md-primary-bg-color: #111111;
+  --md-primary-bg-color--light: #6b6b6b;
+  --md-accent-fg-color: #111111;
+  --md-default-fg-color: #111111;
+  --md-default-fg-color--light: #6b6b6b;
+  --md-default-fg-color--lighter: #a3a3a3;
+  --md-default-fg-color--lightest: #ececec;
+  --md-typeset-color: #262626;
+  --md-typeset-a-color: #111111;
+  --md-code-bg-color: #f7f7f7;
+  --line: #ececec;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 0;
+  --md-default-bg-color: #0f0f0f;
+  --md-primary-fg-color: #0f0f0f;
+  --md-primary-fg-color--light: #0f0f0f;
+  --md-primary-fg-color--dark: #0f0f0f;
+  --md-primary-bg-color: #f2f2f2;
+  --md-primary-bg-color--light: #9a9a9a;
+  --md-accent-fg-color: #ffffff;
+  --md-typeset-a-color: #f2f2f2;
+  --md-code-bg-color: #181818;
+  --md-footer-bg-color: #0f0f0f;
+  --md-footer-bg-color--dark: #0f0f0f;
+  --line: #242424;
+}
+
+/* 页眉与标签栏：去阴影，细分隔线 */
+.md-header,
+.md-header--shadow,
+.md-tabs {
+  box-shadow: none;
+}
+.md-tabs {
+  border-bottom: 1px solid var(--line);
+}
+.md-header__title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.md-tabs__link {
+  opacity: 0.55;
+  font-size: 0.72rem;
+}
+.md-tabs__item--active .md-tabs__link,
+.md-tabs__link:hover {
+  opacity: 1;
+  color: var(--md-primary-bg-color);
+}
+
+/* 搜索框 */
+.md-search__form,
+.md-search__form:hover {
+  background-color: var(--md-code-bg-color);
+  border-radius: 8px;
+}
+.md-search__input,
+.md-search__icon {
+  color: var(--md-default-fg-color);
+}
+.md-search__input::placeholder {
+  color: var(--md-default-fg-color--lighter);
+}
+
+/* 排版 */
+.md-typeset {
+  font-size: 0.78rem;
+  line-height: 1.8;
+}
+.md-typeset h1 {
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+  letter-spacing: -0.02em;
+  margin-bottom: 1.6em;
+}
+.md-typeset h2 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 2.4em;
+  padding-top: 1.2em;
+  border-top: 1px solid var(--line);
+}
+.md-typeset h3 {
+  font-weight: 600;
+}
+.md-typeset a {
+  text-decoration: underline;
+  text-decoration-color: var(--md-default-fg-color--lighter);
+  text-underline-offset: 3px;
+}
+.md-typeset a:hover {
+  text-decoration-color: currentColor;
+}
+.md-typeset .headerlink {
+  text-decoration: none;
+}
+
+/* 侧边导航与目录 */
+.md-nav__link--active {
+  color: var(--md-default-fg-color);
+  font-weight: 600;
+}
+
+/* 表格：只保留横线 */
+.md-typeset table:not([class]) {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 0.74rem;
+}
+.md-typeset table:not([class]) th {
+  background: transparent;
+  font-weight: 600;
+  color: var(--md-default-fg-color--light);
+  border-bottom: 1px solid var(--md-default-fg-color);
+}
+.md-typeset table:not([class]) td {
+  border-top: 1px solid var(--line);
+}
+.md-typeset table:not([class]) tr:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 提示框：左侧细色条 */
+.md-typeset .admonition,
+.md-typeset details {
+  border: none;
+  border-left: 2px solid var(--md-default-fg-color--lighter);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--md-code-bg-color);
+  font-size: 0.74rem;
+}
+.md-typeset .admonition-title,
+.md-typeset summary {
+  background: transparent !important;
+  font-weight: 600;
+}
+.md-typeset .admonition.danger { border-left-color: #d93025; }
+.md-typeset .admonition.warning { border-left-color: #e8a317; }
+.md-typeset .admonition.tip { border-left-color: var(--md-default-fg-color--lighter); }
+.md-typeset .admonition.tip > .admonition-title::before,
+.md-typeset details.question > summary::before,
+.md-typeset details.question > summary::after {
+  background-color: var(--md-default-fg-color--light);
+}
+
+/* 标签页 */
+.md-typeset .tabbed-labels > label {
+  font-weight: 500;
+}
+.md-typeset .tabbed-labels a {
+  text-decoration: none;
+}
+.md-typeset .tabbed-labels::before {
+  background: var(--md-default-fg-color);
+}
+
+/* 勾选清单 */
+.md-typeset [type="checkbox"]:checked + .task-list-indicator::before {
+  background-color: var(--md-default-fg-color);
+}
+
+/* 页脚 */
+.md-footer,
+.md-footer-meta {
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color--light);
+  border-top: 1px solid var(--line);
+}
+.md-footer-meta {
+  font-size: 0.65rem;
+}
