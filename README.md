@@ -13,7 +13,7 @@ npm run dev      # 打开 http://localhost:4321
 
 ## 新增 SOP
 
-1. 复制 `src/content/docs/guide/sop-template.mdx` 到对应分类目录（如 `src/content/docs/molecular/`）。
+1. 复制 `src/content/docs/guide/sop-template.mdx` 到对应分类目录（如 `src/content/docs/synthesis/`）。
 2. 修改顶部 `title`，按模板填写内容。新文件会自动出现在侧边栏。
 3. 提交 Pull Request，由负责人审核后合并。
 
@@ -35,7 +35,7 @@ npm run dev      # 打开 http://localhost:4321
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 ```
 
-用法见 `src/content/docs/molecular/pcr.mdx`。
+用法见 `src/content/docs/synthesis/his-trt-nca.mdx`。
 
 ## 部署到 Cloudflare
 
