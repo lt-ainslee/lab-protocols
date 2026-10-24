@@ -26,9 +26,7 @@ theme:
       toggle:
         icon: material/weather-sunny
         name: 切换到浅色模式
-  font:
-    text: Inter
-    code: JetBrains Mono
+  font: false
   icon:
     logo: material/flask-outline
 
