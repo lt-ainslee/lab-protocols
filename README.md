@@ -49,13 +49,16 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 **方式一：Git 自动部署（推荐）**
 
-在 Cloudflare 控制台 Workers & Pages → 创建 → 导入 Git 仓库，选择本仓库，然后在 Settings → Build 中设置：
+在 Cloudflare 控制台 Workers & Pages → 创建 → 导入 Git 仓库，选择本仓库，然后在 Settings → Builds 中设置：
 
 - 生产分支：`main`
-- 构建命令：留空即可（`wrangler.jsonc` 中已配置 `build.command`，部署前会自动构建）
+- 构建命令：`npm run build`
 - 部署命令：`npx wrangler deploy`
-- 启用非生产分支构建，分支筛选只包含 `experimental`
-- 非生产分支部署命令：`npx wrangler versions upload --preview-alias experimental`
+- Branch control 中勾选 Enable Preview Builds
+- Preview 命令：`npx wrangler preview`（默认值）
+
+预览使用 Cloudflare 的 [Worker Previews](https://developers.cloudflare.com/workers/previews/)，预览名默认取分支名，因此 `experimental` 分支的预览网址固定为 `experimental-lab-protocols.<子域>.workers.dev`。
+`wrangler preview` 要求 `wrangler.jsonc` 中存在 `previews` 配置块（可以为空），请勿删除。
 
 **方式二：本地命令部署**
 

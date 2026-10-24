@@ -8,8 +8,8 @@
     "build": "astro build",
     "build:preview": "SITE_ENV=preview astro build",
     "preview": "astro preview",
-    "deploy": "wrangler deploy",
-    "deploy:preview": "SITE_ENV=preview wrangler versions upload --preview-alias experimental"
+    "deploy": "astro build && wrangler deploy",
+    "deploy:preview": "SITE_ENV=preview astro build && wrangler preview --name experimental"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.7",
