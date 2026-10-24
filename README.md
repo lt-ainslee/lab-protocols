@@ -42,7 +42,7 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 | 分支 | 用途 | 网址 |
 |---|---|---|
 | `main` | 正式版 | `lab-protocols.<子域>.workers.dev` |
-| `ccr-235bf636-qxtro6` | 实验预览版 | `experimental-lab-protocols.<子域>.workers.dev` |
+| `experimental` | 实验预览版 | `experimental-lab-protocols.<子域>.workers.dev` |
 
 预览版页面顶部会显示“实验预览版”提示条，并设置 `noindex` 禁止搜索引擎收录。
 判断逻辑在 `astro.config.mjs`：Cloudflare 构建非 `main` 分支（`WORKERS_CI_BRANCH`），或手动设置 `SITE_ENV=preview` 时，即为预览版。
@@ -54,7 +54,7 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 - 生产分支：`main`
 - 构建命令：`npm run build`
 - 部署命令：`npx wrangler deploy`
-- 启用非生产分支构建，分支筛选只包含 `ccr-235bf636-qxtro6`
+- 启用非生产分支构建，分支筛选只包含 `experimental`
 - 非生产分支部署命令：`npx wrangler versions upload --preview-alias experimental`
 
 **方式二：本地命令部署**
