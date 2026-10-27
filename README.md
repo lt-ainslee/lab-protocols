@@ -68,6 +68,32 @@ npm run deploy           # 正式版
 npm run deploy:preview   # 实验预览版
 ```
 
+## 批注
+
+在 SOP 正文中选中文字即可添加批注，右下角「批注」按钮打开批注面板，可以回复、标记已解决、删除自己的批注。
+
+- 接口：Worker（`worker/`）提供 `/api/annotations`，其余请求返回静态页面。
+- 数据：存放在 D1 数据库，正式版用 `lab-protocols-db`，预览版用 `lab-protocols-db-preview`，互不影响。数据表由 Worker 自动创建（`worker/schema.ts`）。
+- 身份：通过 Cloudflare Access 登录，批注署名为登录邮箱。Worker 会校验 Access 签发的令牌，不信任任何可伪造的请求头。
+
+### 开启 Cloudflare Access
+
+未开启前，所有人都只能查看批注，不能添加。
+
+1. Cloudflare 控制台 → Workers & Pages → `lab-protocols` → Settings → Domains & Routes，在 workers.dev 和 Preview URLs 上开启 Cloudflare Access，并设置允许登录的邮箱（如课题组成员的邮箱）。
+2. 在 Zero Trust → Access → Applications 中打开对应的应用，记下：
+   - 团队域名（Team domain），形如 `xxx.cloudflareaccess.com`
+   - 应用的 Audience (AUD) Tag
+3. 把这两个值填入 `wrangler.jsonc` 中 `vars` 和 `previews.vars` 的 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`，提交后自动部署生效。预览网址如果是单独的 Access 应用，`previews.vars` 填它自己的 AUD。
+
+### 本地调试
+
+```bash
+echo 'DEV_USER=me@example.com' > .dev.vars   # 本地模拟登录用户，不会被提交或部署
+npm run dev:worker                            # http://127.0.0.1:8787，使用本地模拟的 D1
+npm run typecheck
+```
+
 ## 样式
 
 - 主题样式：`src/styles/custom.css`

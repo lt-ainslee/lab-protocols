@@ -5,9 +5,11 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
+    "dev:worker": "astro build && wrangler dev",
     "build": "astro build",
     "build:preview": "SITE_ENV=preview astro build",
     "preview": "astro preview",
+    "typecheck": "tsc -p worker/tsconfig.json",
     "deploy": "astro build && wrangler deploy",
     "deploy:preview": "SITE_ENV=preview astro build && wrangler preview --name experimental"
   },
@@ -21,6 +23,8 @@
     "sharp": "^0.35.5"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261027.1",
+    "typescript": "^5.9.3",
     "wrangler": "^4.152.0"
   },
   "engines": {

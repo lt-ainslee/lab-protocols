@@ -1,16 +1,46 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lab-protocols",
+  // 静态页面（dist/）+ 批注接口（/api/*，代码在 worker/）+ D1。
+  // Worker 自行创建和升级数据表（worker/schema.ts），部署无需迁移步骤。
+  "main": "worker/index.ts",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "404-page"
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lab-protocols-db",
+      "database_id": "48231903-b275-4e5f-a540-2d4251b15fe6"
+    }
+  ],
+  // Cloudflare Access 的团队域名和应用 AUD，开启 Access 后填写（见 README）。
+  // 未填写时所有人都是未登录状态，只能查看批注。
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
   },
   // 正式版：lab-protocols.<子域>.workers.dev
   "workers_dev": true,
   // 预览版（Worker Previews）：npx wrangler preview 按分支名生成预览，
   // experimental 分支即 experimental-lab-protocols.<子域>.workers.dev
   "preview_urls": true,
-  // wrangler preview 要求存在该块；预览版无需单独设置，留空即可
-  "previews": {}
+  // 预览版使用单独的数据库，不会读写正式批注。
+  "previews": {
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "lab-protocols-db-preview",
+        "database_id": "cd35146e-19f9-4d58-8517-1e61580c869b"
+      }
+    ],
+    "vars": {
+      "ACCESS_TEAM_DOMAIN": "",
+      "ACCESS_AUD": ""
+    }
+  }
 }

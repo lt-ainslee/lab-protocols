@@ -36,6 +36,7 @@ export default defineConfig({
       lastUpdated: false,
       components: {
         Banner: './src/components/Banner.astro',
+        MarkdownContent: './src/components/MarkdownContent.astro',
       },
       head: isPreview ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' } }] : [],
     }),

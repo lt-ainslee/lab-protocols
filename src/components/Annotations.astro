@@ -1,0 +1,735 @@
+---
+// 批注：在正文中选中文字即可添加批注，右侧面板显示讨论、回复和解决状态。
+// 数据由 Worker 的 /api/annotations 提供（worker/annotations.ts）；接口不可用时
+// （例如 astro dev）整个功能不显示。
+---
+
+<script>
+  interface Reply {
+    id: string;
+    body: string;
+    author: string;
+    createdAt: number;
+  }
+  interface Thread {
+    id: string;
+    quote: string;
+    prefix: string;
+    suffix: string;
+    body: string;
+    author: string;
+    createdAt: number;
+    resolvedAt: number | null;
+    resolvedBy: string | null;
+    replies: Reply[];
+  }
+  interface Me {
+    user: string | null;
+    authConfigured: boolean;
+  }
+  interface Pending {
+    start: number;
+    end: number;
+    quote: string;
+    prefix: string;
+    suffix: string;
+  }
+
+  const CONTEXT = 32;
+  const MAX_QUOTE = 2000;
+  const PENDING = 'pending';
+
+  const root = document.querySelector<HTMLElement>('.sl-markdown-content');
+  const page = location.pathname.endsWith('/') ? location.pathname : `${location.pathname}/`;
+
+  let me: Me = { user: null, authConfigured: false };
+  let threads: Thread[] = [];
+  let pending: Pending | null = null;
+  let activeId: string | null = null;
+  let showResolved = false;
+  let busy = false;
+
+  // ---------- DOM helpers ----------
+
+  type Attrs = Record<string, string | boolean | ((e: Event) => void)>;
+  function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = {}, ...children: (Node | string | null | false)[]) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (typeof v === 'function') el.addEventListener(k, v);
+      else if (v === true) el.setAttribute(k, '');
+      else if (v !== false) el.setAttribute(k, v);
+    }
+    for (const c of children) if (c) el.append(c);
+    return el;
+  }
+
+  const ICON_COMMENT =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>';
+  const icon = (svg: string) => {
+    const s = h('span', { class: 'anno-icon' });
+    s.innerHTML = svg;
+    return s;
+  };
+
+  const shortName = (email: string) => email.split('@')[0];
+  const fmtTime = (t: number) =>
+    new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(t);
+
+  async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const res = await fetch(path, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+      credentials: 'same-origin',
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    return (res.status === 204 ? null : await res.json()) as T;
+  }
+
+  // ---------- text anchoring ----------
+
+  /** Character offset of a DOM point within the content's text. */
+  function textOffset(node: Node, offset: number) {
+    const r = document.createRange();
+    r.setStart(root!, 0);
+    r.setEnd(node, offset);
+    return r.toString().length;
+  }
+
+  const fullText = () => root!.textContent ?? '';
+
+  /** Best match of a thread's quote, using its prefix / suffix to pick among repeats. */
+  function locate(t: Pick<Thread, 'quote' | 'prefix' | 'suffix'>): [number, number] | null {
+    const text = fullText();
+    let best: [number, number] | null = null;
+    let bestScore = -1;
+    for (let i = text.indexOf(t.quote); i !== -1; i = text.indexOf(t.quote, i + 1)) {
+      let score = 0;
+      const before = text.slice(Math.max(0, i - t.prefix.length), i);
+      const after = text.slice(i + t.quote.length, i + t.quote.length + t.suffix.length);
+      while (score < t.prefix.length && before[before.length - 1 - score] === t.prefix[t.prefix.length - 1 - score]) score++;
+      let s = 0;
+      while (s < t.suffix.length && after[s] === t.suffix[s]) s++;
+      score += s;
+      if (score > bestScore) {
+        bestScore = score;
+        best = [i, i + t.quote.length];
+      }
+    }
+    return best;
+  }
+
+  function wrap(start: number, end: number, id: string, resolved: boolean) {
+    const walker = document.createTreeWalker(root!, NodeFilter.SHOW_TEXT);
+    const hits: { node: Text; a: number; b: number }[] = [];
+    let pos = 0;
+    for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+      const len = n.data.length;
+      const a = Math.max(start, pos) - pos;
+      const b = Math.min(end, pos + len) - pos;
+      if (a < b && n.data.slice(a, b).trim()) hits.push({ node: n, a, b });
+      pos += len;
+      if (pos >= end) break;
+    }
+    for (const { node, a, b } of hits) {
+      let target = node;
+      if (b < target.data.length) target.splitText(b);
+      if (a > 0) target = target.splitText(a);
+      const mark = h('mark', { class: `anno-mark${resolved ? ' is-resolved' : ''}${id === PENDING ? ' is-pending' : ''}`, 'data-anno': id });
+      target.replaceWith(mark);
+      mark.append(target);
+    }
+  }
+
+  function unwrapAll() {
+    root!.querySelectorAll('mark.anno-mark').forEach((m) => m.replaceWith(...m.childNodes));
+    root!.normalize();
+  }
+
+  /** Where each thread sits in the text; null when the quoted text is gone. */
+  let anchors = new Map<string, [number, number] | null>();
+
+  function paint() {
+    unwrapAll();
+    anchors = new Map(threads.map((t) => [t.id, locate(t)]));
+    for (const t of threads) {
+      const at = anchors.get(t.id);
+      if (at && (showResolved || !t.resolvedAt)) wrap(at[0], at[1], t.id, !!t.resolvedAt);
+    }
+    if (pending) wrap(pending.start, pending.end, PENDING, false);
+    if (activeId) root!.querySelectorAll(`mark[data-anno="${activeId}"]`).forEach((m) => m.classList.add('is-active'));
+  }
+
+  // ---------- selection → "add" button ----------
+
+  const addButton = h('button', { class: 'anno-add', type: 'button', hidden: true }, icon(ICON_COMMENT), '批注');
+  let selected: Pending | null = null;
+
+  function readSelection(): Pending | null {
+    const sel = getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+    const range = sel.getRangeAt(0);
+    if (!root!.contains(range.commonAncestorContainer)) return null;
+    const text = fullText();
+    let start = textOffset(range.startContainer, range.startOffset);
+    let end = textOffset(range.endContainer, range.endOffset);
+    while (start < end && /\s/.test(text[start])) start++;
+    while (end > start && /\s/.test(text[end - 1])) end--;
+    if (end <= start || end - start > MAX_QUOTE) return null;
+    return {
+      start,
+      end,
+      quote: text.slice(start, end),
+      prefix: text.slice(Math.max(0, start - CONTEXT), start),
+      suffix: text.slice(end, end + CONTEXT),
+    };
+  }
+
+  function onSelectionChange() {
+    selected = readSelection();
+    if (!selected) {
+      addButton.hidden = true;
+      return;
+    }
+    const rect = getSelection()!.getRangeAt(0).getBoundingClientRect();
+    addButton.hidden = false;
+    const w = addButton.offsetWidth;
+    addButton.style.top = `${rect.bottom + scrollY + 8}px`;
+    addButton.style.left = `${Math.min(Math.max(8, rect.left + scrollX + rect.width / 2 - w / 2), document.documentElement.clientWidth - w - 8)}px`;
+  }
+
+  addButton.addEventListener('mousedown', (e) => e.preventDefault()); // keep the selection
+  addButton.addEventListener('click', () => {
+    if (!selected) return;
+    pending = selected;
+    selected = null;
+    addButton.hidden = true;
+    getSelection()?.removeAllRanges();
+    activeId = null;
+    open();
+    paint();
+    render();
+    panel.querySelector<HTMLTextAreaElement>('.anno-composer textarea')?.focus();
+  });
+
+  // ---------- panel ----------
+
+  const panel = h('aside', { class: 'anno-panel', 'aria-label': '批注', hidden: true });
+  const toggle = h('button', { class: 'anno-toggle', type: 'button', 'aria-expanded': 'false' });
+
+  function open() {
+    panel.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+    document.documentElement.classList.add('anno-open');
+  }
+  function close() {
+    panel.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    document.documentElement.classList.remove('anno-open');
+    pending = null;
+    activeId = null;
+    paint();
+    render();
+  }
+  toggle.addEventListener('click', () => (panel.hidden ? (open(), render()) : close()));
+
+  async function run(task: () => Promise<void>) {
+    if (busy) return;
+    busy = true;
+    panel.classList.add('is-busy');
+    try {
+      await task();
+    } catch (e) {
+      const code = (e as Error).message;
+      alert(code === '401' ? '请先登录后再操作。' : code === '403' ? '只能删除自己的批注。' : '操作失败，请稍后重试。');
+    } finally {
+      busy = false;
+      panel.classList.remove('is-busy');
+    }
+  }
+
+  function signInNotice() {
+    if (me.user) return null;
+    return h(
+      'p',
+      { class: 'anno-notice' },
+      me.authConfigured ? '登录后可以添加和回复批注。' : '批注需要先开启 Cloudflare Access 登录，目前只能查看。',
+    );
+  }
+
+  function composer() {
+    if (!pending || !me.user) return null;
+    const p = pending;
+    const input = h('textarea', { rows: '3', placeholder: '写下批注…', maxlength: '5000' }) as HTMLTextAreaElement;
+    const submit = () =>
+      run(async () => {
+        const body = input.value.trim();
+        if (!body) return;
+        const t = await api<Thread>('/api/annotations', {
+          method: 'POST',
+          body: JSON.stringify({ page, quote: p.quote, prefix: p.prefix, suffix: p.suffix, body }),
+        });
+        threads.push(t);
+        pending = null;
+        activeId = t.id;
+        paint();
+        render();
+      });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
+    });
+    return h(
+      'div',
+      { class: 'anno-card anno-composer' },
+      h('blockquote', { class: 'anno-quote' }, p.quote),
+      input,
+      h(
+        'div',
+        { class: 'anno-actions' },
+        h('button', { type: 'button', class: 'anno-btn is-primary', click: submit }, '发表'),
+        h('button', { type: 'button', class: 'anno-btn', click: () => ((pending = null), paint(), render()) }, '取消'),
+      ),
+    );
+  }
+
+  function replyBox(t: Thread) {
+    if (!me.user) return null;
+    const input = h('textarea', { rows: '1', placeholder: '回复…', maxlength: '5000' }) as HTMLTextAreaElement;
+    const send = () =>
+      run(async () => {
+        const body = input.value.trim();
+        if (!body) return;
+        const r = await api<Reply>(`/api/annotations/${t.id}/replies`, { method: 'POST', body: JSON.stringify({ body }) });
+        t.replies.push(r);
+        render();
+      });
+    input.addEventListener('focus', () => (input.rows = 3));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
+    });
+    return h('div', { class: 'anno-reply-box' }, input, h('button', { type: 'button', class: 'anno-btn', click: send }, '回复'));
+  }
+
+  function card(t: Thread) {
+    const anchored = !!anchors.get(t.id);
+    const mine = me.user === t.author;
+    const active = t.id === activeId;
+    const resolve = () =>
+      run(async () => {
+        const r = await api<{ resolvedAt: number | null; resolvedBy: string | null }>(`/api/annotations/${t.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ resolved: !t.resolvedAt }),
+        });
+        t.resolvedAt = r.resolvedAt;
+        t.resolvedBy = r.resolvedBy;
+        paint();
+        render();
+      });
+    const remove = () =>
+      run(async () => {
+        if (!confirm('删除这条批注及其回复？')) return;
+        await api(`/api/annotations/${t.id}`, { method: 'DELETE' });
+        threads = threads.filter((x) => x.id !== t.id);
+        if (activeId === t.id) activeId = null;
+        paint();
+        render();
+      });
+    const el = h(
+      'article',
+      { class: `anno-card${t.resolvedAt ? ' is-resolved' : ''}${t.id === activeId ? ' is-active' : ''}`, 'data-anno': t.id },
+      h(
+        'blockquote',
+        { class: `anno-quote${anchored ? '' : ' is-orphan'}`, title: anchored ? '定位到原文' : '原文已修改，找不到这段文字' },
+        t.quote,
+      ),
+      h('div', { class: 'anno-meta' }, h('strong', { title: t.author }, shortName(t.author)), h('span', {}, fmtTime(t.createdAt))),
+      h('p', { class: 'anno-body' }, t.body),
+      ...t.replies.map((r) =>
+        h(
+          'div',
+          { class: 'anno-reply' },
+          h('div', { class: 'anno-meta' }, h('strong', { title: r.author }, shortName(r.author)), h('span', {}, fmtTime(r.createdAt))),
+          h('p', { class: 'anno-body' }, r.body),
+        ),
+      ),
+      t.resolvedAt ? h('p', { class: 'anno-resolved-note' }, `${shortName(t.resolvedBy ?? '')} 标记为已解决 · ${fmtTime(t.resolvedAt)}`) : null,
+      // Reply box and actions only on the selected thread, to keep the list light.
+      active && !t.resolvedAt ? replyBox(t) : null,
+      active && me.user
+        ? h(
+            'div',
+            { class: 'anno-actions' },
+            h('button', { type: 'button', class: 'anno-btn', click: resolve }, t.resolvedAt ? '重新打开' : '解决'),
+            mine ? h('button', { type: 'button', class: 'anno-btn is-danger', click: remove }, '删除') : null,
+          )
+        : null,
+    );
+    el.addEventListener('click', (e) => {
+      if ((e.target as Element).closest('button, textarea')) return;
+      if (activeId !== t.id || (e.target as Element).closest('.anno-quote')) focusThread(t.id, 'text');
+    });
+    return el;
+  }
+
+  function render() {
+    const openThreads = threads.filter((t) => !t.resolvedAt);
+    const resolved = threads.filter((t) => t.resolvedAt);
+    toggle.replaceChildren(icon(ICON_COMMENT), h('span', {}, '批注'), openThreads.length ? h('span', { class: 'anno-count' }, String(openThreads.length)) : null);
+
+    const byPosition = (a: Thread, b: Thread) => (anchors.get(a.id)?.[0] ?? Infinity) - (anchors.get(b.id)?.[0] ?? Infinity);
+    const list = [...openThreads.sort(byPosition), ...(showResolved ? resolved.sort(byPosition) : [])];
+
+    const resolvedToggle = h('label', { class: 'anno-switch' }, h('input', { type: 'checkbox', change: () => ((showResolved = !showResolved), paint(), render()) }), `显示已解决（${resolved.length}）`);
+    (resolvedToggle.firstChild as HTMLInputElement).checked = showResolved;
+
+    panel.replaceChildren(
+      h(
+        'header',
+        { class: 'anno-head' },
+        h('h2', {}, '批注'),
+        resolved.length ? resolvedToggle : null,
+        h('button', { type: 'button', class: 'anno-close', 'aria-label': '关闭', click: close }, '×'),
+      ),
+      h(
+        'div',
+        { class: 'anno-list' },
+        signInNotice(),
+        composer(),
+        ...list.map(card),
+        !pending && list.length === 0 ? h('p', { class: 'anno-empty' }, me.user ? '在正文中选中文字，即可添加批注。' : '暂无批注。') : null,
+      ),
+    );
+  }
+
+  function focusThread(id: string, scrollTo: 'card' | 'text') {
+    activeId = id;
+    open();
+    paint();
+    render();
+    if (scrollTo === 'card') panel.querySelector(`.anno-card[data-anno="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    else root!.querySelector(`mark[data-anno="${id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  async function init() {
+    if (!root) return;
+    try {
+      [me, { threads }] = await Promise.all([api<Me>('/api/me'), api<{ threads: Thread[] }>(`/api/annotations?page=${encodeURIComponent(page)}`)]);
+    } catch {
+      return; // no API here (e.g. astro dev): annotations stay off
+    }
+    document.body.append(addButton, toggle, panel);
+    paint();
+    render();
+
+    root.addEventListener('click', (e) => {
+      const mark = (e.target as Element).closest<HTMLElement>('mark.anno-mark');
+      const id = mark?.dataset.anno;
+      if (id && id !== PENDING && getSelection()?.isCollapsed) focusThread(id, 'card');
+    });
+    if (me.user) {
+      let timer = 0;
+      document.addEventListener('selectionchange', () => {
+        clearTimeout(timer);
+        timer = window.setTimeout(onSelectionChange, 200);
+      });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !panel.hidden) close();
+    });
+  }
+
+  init();
+</script>
+
+<style is:global>
+  .anno-icon {
+    display: inline-flex;
+  }
+
+  /* Highlights in the text */
+  mark.anno-mark {
+    background: rgb(255 204 0 / 0.22);
+    color: inherit;
+    border-bottom: 1.5px solid rgb(232 163 23 / 0.8);
+    cursor: pointer;
+    padding: 0;
+  }
+  mark.anno-mark.is-active {
+    background: rgb(255 204 0 / 0.45);
+  }
+  mark.anno-mark.is-pending {
+    background: rgb(255 204 0 / 0.35);
+    border-bottom-style: dashed;
+  }
+  mark.anno-mark.is-resolved {
+    background: transparent;
+    border-bottom: 1.5px dotted var(--sl-color-gray-4);
+  }
+  :root:not([data-theme='light']) mark.anno-mark {
+    background: rgb(255 204 0 / 0.16);
+  }
+  :root:not([data-theme='light']) mark.anno-mark.is-active {
+    background: rgb(255 204 0 / 0.32);
+  }
+
+  /* Floating buttons */
+  .anno-add,
+  .anno-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font: 500 0.8125rem/1 var(--sans);
+    color: var(--sl-color-black);
+    background: var(--sl-color-white);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  }
+  .anno-add {
+    position: absolute;
+    z-index: calc(var(--sl-z-index-navbar) + 1);
+    padding: 0.5rem 0.85rem;
+  }
+  .anno-add[hidden] {
+    display: none;
+  }
+  .anno-toggle {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: var(--sl-z-index-navbar);
+    padding: 0.65rem 1rem;
+  }
+  .anno-count {
+    min-width: 1.25rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 999px;
+    background: #e8a317;
+    color: #111;
+    font-size: 0.75rem;
+    text-align: center;
+  }
+  .anno-open .anno-toggle {
+    display: none;
+  }
+
+  /* Side panel */
+  .anno-panel {
+    position: fixed;
+    top: var(--sl-nav-height);
+    right: 0;
+    bottom: 0;
+    z-index: var(--sl-z-index-navbar);
+    width: min(24rem, 100vw);
+    display: flex;
+    flex-direction: column;
+    background: var(--sl-color-black);
+    border-inline-start: 1px solid var(--line);
+    box-shadow: -8px 0 24px rgb(0 0 0 / 0.06);
+    font-family: var(--sans);
+  }
+  .anno-panel[hidden] {
+    display: none;
+  }
+  .anno-panel.is-busy {
+    cursor: progress;
+  }
+  .anno-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .anno-head h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+  .anno-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-3);
+    cursor: pointer;
+  }
+  .anno-close {
+    margin-inline-start: auto;
+    border: none;
+    background: none;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--sl-color-gray-3);
+    cursor: pointer;
+  }
+  .anno-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 1.25rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .anno-notice,
+  .anno-empty {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--sl-color-gray-3);
+  }
+  .anno-notice {
+    padding: 0.6rem 0.8rem;
+    background: var(--panel);
+    border-inline-start: 2px solid var(--sl-color-gray-4);
+  }
+
+  /* Cards */
+  .anno-card {
+    padding: 0.85rem 0.95rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--sl-color-black);
+    font-size: 0.8125rem;
+    color: var(--sl-color-gray-2);
+  }
+  .anno-card:not(.anno-composer) {
+    cursor: pointer;
+  }
+  .anno-card.is-active {
+    cursor: default;
+    border-color: #e8a317;
+    box-shadow: 0 0 0 3px rgb(232 163 23 / 0.15);
+  }
+  .anno-card.is-resolved {
+    opacity: 0.65;
+  }
+  .anno-quote {
+    margin: 0 0 0.6rem;
+    padding: 0 0 0 0.6rem;
+    border-inline-start: 2px solid #e8a317;
+    font-family: var(--serif);
+    font-size: 0.8125rem;
+    color: var(--sl-color-gray-3);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .anno-quote.is-orphan {
+    border-inline-start-color: var(--sl-color-gray-4);
+    text-decoration: line-through;
+    cursor: default;
+  }
+  .anno-meta {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-3);
+  }
+  .anno-meta strong {
+    color: var(--sl-color-white);
+    font-weight: 600;
+  }
+  .anno-body {
+    margin: 0.3rem 0 0;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    color: var(--sl-color-gray-1);
+  }
+  .anno-reply {
+    margin-top: 0.75rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid var(--line);
+  }
+  .anno-resolved-note {
+    margin: 0.75rem 0 0;
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-3);
+  }
+  .anno-card textarea {
+    display: block;
+    width: 100%;
+    margin-top: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--panel);
+    color: var(--sl-color-white);
+    font: inherit;
+    resize: vertical;
+  }
+  .anno-card textarea:focus {
+    outline: none;
+    border-color: var(--sl-color-gray-3);
+  }
+  .anno-composer textarea {
+    margin-top: 0;
+  }
+  .anno-reply-box {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+    margin-top: 0.6rem;
+  }
+  .anno-reply-box textarea {
+    margin-top: 0;
+  }
+  .anno-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+  }
+  .anno-btn {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font: 500 0.75rem/1.4 var(--sans);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .anno-btn:hover {
+    border-color: var(--sl-color-gray-3);
+    color: var(--sl-color-white);
+  }
+  .anno-btn.is-primary {
+    background: var(--sl-color-white);
+    border-color: var(--sl-color-white);
+    color: var(--sl-color-black);
+  }
+  .anno-btn.is-danger:hover {
+    border-color: #d93025;
+    color: #d93025;
+  }
+
+  /* Leave room for the panel on wide screens */
+  @media (min-width: 72rem) {
+    .anno-open .main-frame {
+      padding-inline-end: 24rem;
+    }
+    .anno-open .right-sidebar-container {
+      display: none;
+    }
+    /* The text column gets narrow: let tables scroll instead of wrapping cells */
+    .anno-open .sl-markdown-content table {
+      display: block;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+  }
+  @media (max-width: 50rem) {
+    .anno-panel {
+      top: auto;
+      height: 70vh;
+      width: 100vw;
+      border-inline-start: none;
+      border-top: 1px solid var(--line);
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 -8px 24px rgb(0 0 0 / 0.12);
+    }
+  }
+</style>
