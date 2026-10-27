@@ -59,6 +59,7 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 预览使用 Cloudflare 的 [Worker Previews](https://developers.cloudflare.com/workers/previews/)，预览名默认取分支名，因此 `experimental` 分支的预览网址固定为 `experimental-lab-protocols.<子域>.workers.dev`。
 `wrangler preview` 要求 `wrangler.jsonc` 中存在 `previews` 配置块（可以为空），请勿删除。
+`wrangler.jsonc` 中的 `build.command` 让 wrangler 在部署和预览前自动构建 `dist/`；新分支的 Preview 构建不会执行控制台里的构建命令，请勿删除。
 
 **方式二：本地命令部署**
 

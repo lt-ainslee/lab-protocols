@@ -5,13 +5,13 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "dev:worker": "astro build && wrangler dev",
+    "dev:worker": "wrangler dev",
     "build": "astro build",
     "build:preview": "SITE_ENV=preview astro build",
     "preview": "astro preview",
     "typecheck": "tsc -p worker/tsconfig.json",
-    "deploy": "astro build && wrangler deploy",
-    "deploy:preview": "SITE_ENV=preview astro build && wrangler preview --name experimental"
+    "deploy": "wrangler deploy",
+    "deploy:preview": "SITE_ENV=preview wrangler preview --name experimental"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.7",
