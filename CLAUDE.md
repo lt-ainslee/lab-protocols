@@ -11,4 +11,6 @@
 - **不要动这些配置**，除非确认 Worker Previews 仍能工作：`wrangler.jsonc` 里的 `previews` 块（`wrangler preview` 必需）、`preview_urls`、预览用的单独 D1 数据库、`package.json` 的 `engines.node`。
 - 新增绑定（D1、KV、变量等）时，正式和 `previews` 两处都要加，否则预览构建会缺绑定。
 - 检查在 0 秒内失败、输出为空：说明构建根本没开始，问题在 Cloudflare 控制台的构建配置（分支控制、构建/预览命令、Node 版本），不在代码里。先让用户把控制台里的构建日志贴过来，不要盲改代码或空提交重跑。
+- **每个推送的分支都会在 Cloudflare 生成一个独立的 Preview**（名称和 Tracking branch 都是分支名），各有自己的构建设置（构建命令 `npm run build`，预览命令 `npx wrangler preview`）。Claude 会话分支（`ccr-*`）也会各生成一个；Auto-deletion 只在分支被删除时才清理 Preview，合并后不删分支，旧 Preview 就一直留着（例如 `ccr-235bf636-qxtro6`）。内容最终要进 `experimental`，所以合并后应删掉会话分支。
+- Node 版本由 `.nvmrc`（24）决定，控制台里没有设置构建变量；改 Node 版本时同时改 `.nvmrc` 和 `package.json` 的 `engines`。
 - 只改文档内容（`src/content/docs/`、`src/assets/`）的 PR 若预览检查失败，先在 PR 里说明本地构建已通过，再请用户查看控制台日志。
