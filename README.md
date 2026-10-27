@@ -37,6 +37,23 @@ import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
 用法见 `src/content/docs/molecular/pcr.mdx`。
 
+## 化学结构式
+
+结构式统一用 SVG 图片，在 `.mdx` 文件中通过 `Structure` 组件插入（`.md` 文件需先改名为 `.mdx`）：
+
+```mdx
+import Structure from '../../../components/Structure.astro';
+import tris from '../../../assets/structures/tris.svg';
+
+<Structure src={tris} alt="Tris 结构式" caption="Tris（三羟甲基氨基甲烷）" width={220} />
+```
+
+- `alt` 必填；`caption` 为图注，可省略；`width` 为显示宽度（像素），省略时用 SVG 原始宽度。
+- 用 ChemDraw、[Ketcher](https://lifescience.opensource.epam.com/KetcherDemo/index.html) 或 ChemSketch 绘制，导出为 SVG，保存到 `src/assets/structures/`，文件名用小写英文加连字符（如 `edta-disodium.svg`）。
+- 导出时用**黑色线条、透明背景**、不着色杂原子。深色模式下网站会把图片整体反色为白线，带颜色或白色背景的图在深色模式下会显示异常。
+- 源文件（`.cdxml` 或 `.mol`）与 SVG 同名放在同一目录并一起提交，方便以后修改。
+- 示例见 `src/content/docs/reagents/tae-buffer.mdx`。
+
 ## 部署到 Cloudflare
 
 | 分支 | 用途 | 网址 |
