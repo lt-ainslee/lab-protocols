@@ -5,6 +5,11 @@
   // Worker 自行创建和升级数据表（worker/schema.ts），部署无需迁移步骤。
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-01",
+  // wrangler deploy / preview / dev 会先执行此命令生成 dist/，不依赖控制台的构建命令设置
+  // （新分支的 Preview 构建不会执行控制台里的构建命令，会因缺少 dist/ 失败）
+  "build": {
+    "command": "npm run build"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
