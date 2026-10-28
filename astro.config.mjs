@@ -30,13 +30,13 @@ export default defineConfig({
       ],
       sidebar: [
         { label: '安全规范', items: [{ autogenerate: { directory: 'safety' } }] },
-        { label: '分子生物学', items: [{ autogenerate: { directory: 'molecular' } }] },
-        { label: '试剂配方', items: [{ autogenerate: { directory: 'reagents' } }] },
+        { label: 'NCA 单体合成', items: [{ autogenerate: { directory: 'synthesis' } }] },
         { label: '模板', items: [{ autogenerate: { directory: 'guide' } }] },
       ],
       lastUpdated: false,
       components: {
         Banner: './src/components/Banner.astro',
+        MarkdownContent: './src/components/MarkdownContent.astro',
       },
       head: isPreview ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' } }] : [],
     }),

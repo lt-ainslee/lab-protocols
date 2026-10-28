@@ -132,6 +132,13 @@ starlight-toc a[aria-current='true'] {
   font-size: 0.95em;
   font-variant-numeric: lining-nums tabular-nums;
 }
+@media (max-width: 50rem) {
+  .sl-markdown-content table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
 .sl-markdown-content :is(th, td) {
   border: none;
   border-bottom: 1px solid var(--line);
