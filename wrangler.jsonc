@@ -2,6 +2,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lab-protocols",
   "compatibility_date": "2026-10-01",
+  // 部署前由 wrangler 自动构建，不依赖控制台里的构建命令设置（deploy 和 preview 都适用）
+  "build": {
+    "command": "npm run build"
+  },
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page"
