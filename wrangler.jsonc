@@ -27,8 +27,8 @@
   // 未填写时所有人都是未登录状态，只能查看批注。
   // GITHUB_*：批注「转为 issue」发到的仓库和标签；还需要 GITHUB_TOKEN 密钥（见 README），未设置时不显示按钮。
   "vars": {
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": "",
+    "ACCESS_TEAM_DOMAIN": "ainslee-lt.cloudflareaccess.com",
+    "ACCESS_AUD": "b920cd8c6a1639cb781b8d6d764e983c3ead715aae6a931e7d686a1c22b6bc3e",
     "GITHUB_REPO": "lt-ainslee/lab-protocols",
     "GITHUB_ISSUE_LABELS": "annotation,claude",
     "SITE_ENV": "production"
@@ -48,8 +48,8 @@
       }
     ],
     "vars": {
-      "ACCESS_TEAM_DOMAIN": "",
-      "ACCESS_AUD": "",
+      "ACCESS_TEAM_DOMAIN": "ainslee-lt.cloudflareaccess.com",
+      "ACCESS_AUD": "b920cd8c6a1639cb781b8d6d764e983c3ead715aae6a931e7d686a1c22b6bc3e",
       "GITHUB_REPO": "lt-ainslee/lab-protocols",
       "GITHUB_ISSUE_LABELS": "annotation,claude",
       "SITE_ENV": "preview"
