@@ -284,7 +284,9 @@ const { entry } = Astro.locals.starlightRoute;
             ? '只能删除自己的批注。'
             : code === '503'
               ? 'GitHub 连接尚未配置，暂时不能转为 issue。'
-              : '操作失败，请稍后重试。',
+              : code === '409'
+                ? '这条批注正在转为 issue，请稍后刷新页面查看。'
+                : '操作失败，请稍后重试。',
       );
     } finally {
       busy = false;

@@ -27,6 +27,8 @@ interface Row {
 }
 
 const LIMITS = { page: 300, quote: 2000, context: 64, body: 5000, title: 200, source: 300 };
+// A claim older than this is taken to be from a request that died mid-way.
+const ISSUE_CLAIM_MS = 2 * 60 * 1000;
 const ID_RE = /^[0-9a-f-]{36}$/;
 const COLUMNS = 'id, page, parent_id, quote, prefix, suffix, body, author, created_at, resolved_at, resolved_by, issue_number, issue_url';
 
@@ -133,6 +135,17 @@ export async function handleAnnotations(req: Request, env: Env, path: string): P
     if (target.parent_id) return error(400, 'not_a_thread');
     if (!issuesConfigured(env)) return error(503, 'issues_not_configured');
     if (target.issue_url) return json({ issueNumber: target.issue_number, issueUrl: target.issue_url });
+    // Claim the thread before calling GitHub: of two concurrent requests only one gets the row.
+    const claim = await db
+      .prepare('UPDATE annotations SET issue_claimed_at = ? WHERE id = ? AND issue_url IS NULL AND (issue_claimed_at IS NULL OR issue_claimed_at < ?)')
+      .bind(now, id, now - ISSUE_CLAIM_MS)
+      .run();
+    if (claim.meta.changes !== 1) {
+      const done = await db.prepare('SELECT issue_number, issue_url FROM annotations WHERE id = ?').bind(id).first<Pick<Row, 'issue_number' | 'issue_url'>>();
+      if (done?.issue_url) return json({ issueNumber: done.issue_number, issueUrl: done.issue_url });
+      return error(409, 'issue_in_progress');
+    }
+    const release = () => db.prepare('UPDATE annotations SET issue_claimed_at = NULL WHERE id = ?').bind(id).run();
     const b = await readBody(req);
     const { results: replies } = await db
       .prepare('SELECT body, author, created_at FROM annotations WHERE parent_id = ? AND deleted_at IS NULL ORDER BY created_at')
@@ -150,12 +163,13 @@ export async function handleAnnotations(req: Request, env: Env, path: string): P
     try {
       issue = await createIssue(env, content);
     } catch (e) {
+      await release();
       if (!(e instanceof GitHubError)) throw e;
       console.error(e.message);
       return error(502, 'github_error', { status: e.status, message: e.detail });
     }
     await db
-      .prepare('UPDATE annotations SET issue_number = ?, issue_url = ?, updated_at = ? WHERE id = ?')
+      .prepare('UPDATE annotations SET issue_number = ?, issue_url = ?, issue_claimed_at = NULL, updated_at = ? WHERE id = ?')
       .bind(issue.number, issue.url, now, id)
       .run();
     return json({ issueNumber: issue.number, issueUrl: issue.url }, 201);

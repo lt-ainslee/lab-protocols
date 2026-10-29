@@ -33,6 +33,12 @@ export const MIGRATIONS: { version: number; sql: string[] }[] = [
     // The GitHub issue a thread was turned into (worker/issues.ts).
     sql: [`ALTER TABLE annotations ADD COLUMN issue_number INTEGER`, `ALTER TABLE annotations ADD COLUMN issue_url TEXT`],
   },
+  {
+    version: 3,
+    // Set while a request is creating the thread's issue, so a double click
+    // or two people at once cannot open two issues for one thread.
+    sql: [`ALTER TABLE annotations ADD COLUMN issue_claimed_at INTEGER`],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
