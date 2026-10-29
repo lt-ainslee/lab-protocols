@@ -2,7 +2,11 @@
 // 批注：在正文中选中文字即可添加批注，右侧面板显示讨论、回复和解决状态。
 // 数据由 Worker 的 /api/annotations 提供（worker/annotations.ts）；接口不可用时
 // （例如 astro dev）整个功能不显示。
+// 「转为 issue」把一条批注发到 GitHub（worker/issues.ts），issue 里带上源文件路径。
+const { entry } = Astro.locals.starlightRoute;
 ---
+
+<span id="anno-source" data-source={entry.filePath} data-title={entry.data.title} hidden></span>
 
 <script>
   interface Reply {
@@ -21,11 +25,14 @@
     createdAt: number;
     resolvedAt: number | null;
     resolvedBy: string | null;
+    issueNumber: number | null;
+    issueUrl: string | null;
     replies: Reply[];
   }
   interface Me {
     user: string | null;
     authConfigured: boolean;
+    issuesEnabled?: boolean;
   }
   interface Pending {
     start: number;
@@ -41,6 +48,7 @@
 
   const root = document.querySelector<HTMLElement>('.sl-markdown-content');
   const page = location.pathname.endsWith('/') ? location.pathname : `${location.pathname}/`;
+  const sourceInfo = document.getElementById('anno-source')?.dataset ?? {};
 
   let me: Me = { user: null, authConfigured: false };
   let threads: Thread[] = [];
@@ -240,7 +248,15 @@
       await task();
     } catch (e) {
       const code = (e as Error).message;
-      alert(code === '401' ? '请先登录后再操作。' : code === '403' ? '只能删除自己的批注。' : '操作失败，请稍后重试。');
+      alert(
+        code === '401'
+          ? '请先登录后再操作。'
+          : code === '403'
+            ? '只能删除自己的批注。'
+            : code === '503'
+              ? 'GitHub 连接尚未配置，暂时不能转为 issue。'
+              : '操作失败，请稍后重试。',
+      );
     } finally {
       busy = false;
       panel.classList.remove('is-busy');
@@ -333,6 +349,17 @@
         paint();
         render();
       });
+    const toIssue = () =>
+      run(async () => {
+        if (!confirm('把这条批注（含回复）发到 GitHub issue？带 claude 标签的 issue 会由 Claude 修改 SOP。')) return;
+        const r = await api<{ issueNumber: number; issueUrl: string }>(`/api/annotations/${t.id}/issue`, {
+          method: 'POST',
+          body: JSON.stringify({ title: sourceInfo.title ?? document.title, source: sourceInfo.source ?? '' }),
+        });
+        t.issueNumber = r.issueNumber;
+        t.issueUrl = r.issueUrl;
+        render();
+      });
     const el = h(
       'article',
       { class: `anno-card${t.resolvedAt ? ' is-resolved' : ''}${t.id === activeId ? ' is-active' : ''}`, 'data-anno': t.id },
@@ -351,6 +378,14 @@
           h('p', { class: 'anno-body' }, r.body),
         ),
       ),
+      t.issueUrl
+        ? h(
+            'p',
+            { class: 'anno-issue-note' },
+            '已转为 ',
+            h('a', { href: t.issueUrl, target: '_blank', rel: 'noopener' }, `GitHub issue #${t.issueNumber}`),
+          )
+        : null,
       t.resolvedAt ? h('p', { class: 'anno-resolved-note' }, `${shortName(t.resolvedBy ?? '')} 标记为已解决 · ${fmtTime(t.resolvedAt)}`) : null,
       // Reply box and actions only on the selected thread, to keep the list light.
       active && !t.resolvedAt ? replyBox(t) : null,
@@ -359,12 +394,15 @@
             'div',
             { class: 'anno-actions' },
             h('button', { type: 'button', class: 'anno-btn', click: resolve }, t.resolvedAt ? '重新打开' : '解决'),
+            me.issuesEnabled && !t.issueUrl && !t.resolvedAt
+              ? h('button', { type: 'button', class: 'anno-btn', click: toIssue }, '转为 issue')
+              : null,
             mine ? h('button', { type: 'button', class: 'anno-btn is-danger', click: remove }, '删除') : null,
           )
         : null,
     );
     el.addEventListener('click', (e) => {
-      if ((e.target as Element).closest('button, textarea')) return;
+      if ((e.target as Element).closest('button, textarea, a')) return;
       if (activeId !== t.id || (e.target as Element).closest('.anno-quote')) focusThread(t.id, 'text');
     });
     return el;
@@ -644,10 +682,16 @@
     padding-top: 0.65rem;
     border-top: 1px solid var(--line);
   }
+  .anno-issue-note,
   .anno-resolved-note {
     margin: 0.75rem 0 0;
     font-size: 0.75rem;
     color: var(--sl-color-gray-3);
+  }
+  .anno-issue-note a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
   .anno-card textarea {
     display: block;
@@ -679,6 +723,7 @@
   }
   .anno-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin-top: 0.7rem;
   }

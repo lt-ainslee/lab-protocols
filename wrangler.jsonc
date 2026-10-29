@@ -25,9 +25,13 @@
   ],
   // Cloudflare Access 的团队域名和应用 AUD，开启 Access 后填写（见 README）。
   // 未填写时所有人都是未登录状态，只能查看批注。
+  // GITHUB_*：批注「转为 issue」发到的仓库和标签；还需要 GITHUB_TOKEN 密钥（见 README），未设置时不显示按钮。
   "vars": {
     "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_AUD": "",
+    "GITHUB_REPO": "lt-ainslee/lab-protocols",
+    "GITHUB_ISSUE_LABELS": "annotation,claude",
+    "SITE_ENV": "production"
   },
   // 正式版：lab-protocols.<子域>.workers.dev
   "workers_dev": true,
@@ -45,7 +49,10 @@
     ],
     "vars": {
       "ACCESS_TEAM_DOMAIN": "",
-      "ACCESS_AUD": ""
+      "ACCESS_AUD": "",
+      "GITHUB_REPO": "lt-ainslee/lab-protocols",
+      "GITHUB_ISSUE_LABELS": "annotation,claude",
+      "SITE_ENV": "preview"
     }
   }
 }

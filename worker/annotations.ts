@@ -4,8 +4,10 @@
 //   POST   /api/annotations/:id/replies          reply {body}
 //   PATCH  /api/annotations/:id                  {resolved: boolean} (threads only)
 //   DELETE /api/annotations/:id                  soft delete, author only
+//   POST   /api/annotations/:id/issue            turn a thread into a GitHub issue {title, source}
 import { userOf } from './auth';
 import { error, json, type Env } from './http';
+import { createIssue, issueContent, issuesConfigured } from './issues';
 
 interface Row {
   id: string;
@@ -19,11 +21,13 @@ interface Row {
   created_at: number;
   resolved_at: number | null;
   resolved_by: string | null;
+  issue_number: number | null;
+  issue_url: string | null;
 }
 
-const LIMITS = { page: 300, quote: 2000, context: 64, body: 5000 };
+const LIMITS = { page: 300, quote: 2000, context: 64, body: 5000, title: 200, source: 300 };
 const ID_RE = /^[0-9a-f-]{36}$/;
-const COLUMNS = 'id, page, parent_id, quote, prefix, suffix, body, author, created_at, resolved_at, resolved_by';
+const COLUMNS = 'id, page, parent_id, quote, prefix, suffix, body, author, created_at, resolved_at, resolved_by, issue_number, issue_url';
 
 const validPage = (p: unknown): p is string => typeof p === 'string' && p.startsWith('/') && p.length <= LIMITS.page;
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
@@ -53,6 +57,8 @@ function threads(rows: Row[]) {
       createdAt: t.created_at,
       resolvedAt: t.resolved_at,
       resolvedBy: t.resolved_by,
+      issueNumber: t.issue_number,
+      issueUrl: t.issue_url,
       replies: (replies.get(t.id) ?? []).map((r) => ({ id: r.id, body: r.body, author: r.author, createdAt: r.created_at })),
     }));
 }
@@ -96,6 +102,8 @@ export async function handleAnnotations(req: Request, env: Env, path: string): P
       created_at: now,
       resolved_at: null,
       resolved_by: null,
+      issue_number: null,
+      issue_url: null,
     };
     await db
       .prepare('INSERT INTO annotations (id, page, quote, prefix, suffix, body, author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -119,6 +127,31 @@ export async function handleAnnotations(req: Request, env: Env, path: string): P
       .bind(reply.id, target.page, target.id, body, user, now, now)
       .run();
     return json(reply, 201);
+  }
+  if (parts[3] === 'issue') {
+    if (req.method !== 'POST') return error(405, 'method_not_allowed');
+    if (target.parent_id) return error(400, 'not_a_thread');
+    if (!issuesConfigured(env)) return error(503, 'issues_not_configured');
+    if (target.issue_url) return json({ issueNumber: target.issue_number, issueUrl: target.issue_url });
+    const b = await readBody(req);
+    const { results: replies } = await db
+      .prepare('SELECT body, author, created_at FROM annotations WHERE parent_id = ? AND deleted_at IS NULL ORDER BY created_at')
+      .bind(id)
+      .all<{ body: string; author: string; created_at: number }>();
+    const content = issueContent(target, replies, {
+      id,
+      origin: new URL(req.url).origin,
+      title: text(b?.title, LIMITS.title),
+      source: text(b?.source, LIMITS.source),
+      by: user,
+      preview: env.SITE_ENV === 'preview',
+    });
+    const issue = await createIssue(env, content);
+    await db
+      .prepare('UPDATE annotations SET issue_number = ?, issue_url = ?, updated_at = ? WHERE id = ?')
+      .bind(issue.number, issue.url, now, id)
+      .run();
+    return json({ issueNumber: issue.number, issueUrl: issue.url }, 201);
   }
   if (parts[3] !== undefined) return error(404, 'not_found');
 

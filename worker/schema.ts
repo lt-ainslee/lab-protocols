@@ -28,6 +28,11 @@ export const MIGRATIONS: { version: number; sql: string[] }[] = [
       `CREATE INDEX IF NOT EXISTS idx_annotations_parent ON annotations (parent_id)`,
     ],
   },
+  {
+    version: 2,
+    // The GitHub issue a thread was turned into (worker/issues.ts).
+    sql: [`ALTER TABLE annotations ADD COLUMN issue_number INTEGER`, `ALTER TABLE annotations ADD COLUMN issue_url TEXT`],
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
