@@ -1,0 +1,108 @@
+---
+// 导出：PDF 走浏览器打印（样式见 src/styles/print.css），Word 在浏览器里把正文转成
+// .docx（src/scripts/export-docx.ts），都按网页的浅色样式排版。
+---
+
+<div class="export-bar not-content" data-pagefind-ignore>
+  <button type="button" data-export="pdf" title="在打印对话框中选择“另存为 PDF”">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6m-3-3 3 3 3-3"/></svg>
+    导出 PDF
+  </button>
+  <button type="button" data-export="word" title="下载 Word 文档（.docx）">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m8.5 12 1.25 6L12 14l2.25 4 1.25-6"/></svg>
+    <span>导出 Word</span>
+  </button>
+</div>
+
+<script>
+  const root = document.querySelector<HTMLElement>('.sl-markdown-content');
+  const titleEl = document.querySelector<HTMLElement>('h1#_top');
+  const pageTitle = titleEl?.textContent?.trim() || document.title;
+
+  // ---------- PDF：打印前切到浅色、展开折叠内容，文件名用页面标题 ----------
+
+  let saved: { theme?: string; title: string; closed: HTMLDetailsElement[] } | null = null;
+  addEventListener('beforeprint', () => {
+    if (saved) return;
+    const closed = [...document.querySelectorAll<HTMLDetailsElement>('.sl-markdown-content details:not([open])')];
+    saved = { theme: document.documentElement.dataset.theme, title: document.title, closed };
+    document.documentElement.dataset.theme = 'light';
+    closed.forEach((d) => (d.open = true));
+    document.title = pageTitle;
+  });
+  addEventListener('afterprint', () => {
+    if (!saved) return;
+    if (saved.theme) document.documentElement.dataset.theme = saved.theme;
+    saved.closed.forEach((d) => (d.open = false));
+    document.title = saved.title;
+    saved = null;
+  });
+
+  document.querySelector('[data-export="pdf"]')?.addEventListener('click', () => print());
+
+  // ---------- Word：按需加载转换代码（docx 库较大） ----------
+
+  async function exportWord() {
+    const { exportDocx } = await import('../scripts/export-docx');
+    const blob = await exportDocx(root!, pageTitle);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${pageTitle.replace(/[\\/:*?"<>|]+/g, '_')}.docx`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  }
+
+  const wordButton = document.querySelector<HTMLButtonElement>('[data-export="word"]');
+  wordButton?.addEventListener('click', async () => {
+    const label = wordButton.querySelector('span')!;
+    wordButton.disabled = true;
+    label.textContent = '正在生成…';
+    try {
+      await exportWord();
+    } catch (err) {
+      console.error(err);
+      alert('导出 Word 失败，请稍后重试。');
+    } finally {
+      wordButton.disabled = false;
+      label.textContent = '导出 Word';
+    }
+  });
+
+  if (!root) document.querySelector('.export-bar')?.remove();
+</script>
+
+<style>
+  .export-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .export-bar button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    font: 500 0.8125rem/1.2 var(--sans);
+    color: var(--sl-color-gray-3);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 0.375rem;
+    cursor: pointer;
+  }
+  .export-bar button:hover:not(:disabled) {
+    color: var(--sl-color-white);
+    border-color: var(--sl-color-gray-4);
+  }
+  .export-bar button:disabled {
+    cursor: progress;
+    opacity: 0.6;
+  }
+  @media print {
+    .export-bar {
+      display: none;
+    }
+  }
+</style>

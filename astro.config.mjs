@@ -27,6 +27,7 @@ export default defineConfig({
         '@fontsource/inter/600.css',
         '@fontsource/jetbrains-mono/400.css',
         './src/styles/custom.css',
+        './src/styles/print.css',
       ],
       sidebar: [
         { label: '安全规范', items: [{ autogenerate: { directory: 'safety' } }] },
@@ -37,6 +38,7 @@ export default defineConfig({
       components: {
         Banner: './src/components/Banner.astro',
         MarkdownContent: './src/components/MarkdownContent.astro',
+        PageTitle: './src/components/PageTitle.astro',
       },
       head: isPreview ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' } }] : [],
     }),
