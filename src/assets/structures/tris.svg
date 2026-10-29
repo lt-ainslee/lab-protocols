@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 40 220 150" width="220" height="150" role="img" aria-labelledby="t">
+  <title id="t">Tris（三羟甲基氨基甲烷）</title>
+  <g fill="none" stroke="#000" stroke-width="2" stroke-linecap="round">
+    <path d="M150 105 V72"/>
+    <path d="M150 105 L111 127.5 L84 112"/>
+    <path d="M150 105 L189 127.5 L216 112"/>
+    <path d="M150 105 V150 L177 165.6"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#000" text-anchor="middle">
+    <text x="150" y="65">NH<tspan font-size="14" dy="5">2</tspan></text>
+    <text x="64" y="112">HO</text>
+    <text x="236" y="112">OH</text>
+    <text x="197" y="180">OH</text>
+  </g>
+</svg>
