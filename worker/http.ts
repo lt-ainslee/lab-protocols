@@ -15,4 +15,12 @@ export interface Env {
   ACCESS_AUD?: string;
   /** Local development only (.dev.vars): acts as this user without Access. */
   DEV_USER?: string;
+  /** Secret: GitHub token allowed to create issues in GITHUB_REPO. */
+  GITHUB_TOKEN?: string;
+  /** "owner/repo" that annotations are turned into issues in. */
+  GITHUB_REPO?: string;
+  /** Comma-separated labels for those issues; "claude" hands them to the Claude workflow. */
+  GITHUB_ISSUE_LABELS?: string;
+  /** "preview" on Worker Previews, to tell the two sites apart in issues. */
+  SITE_ENV?: string;
 }

@@ -1,0 +1,58 @@
+# Claude 处理 issue 和 PR 评论：
+# - issue 加上 `claude` 标签（网站批注「转为 issue」会自动加）→ Claude 按 issue 修改 SOP，
+#   从 experimental 拉出 claude/ 分支提交，并在 issue 里回复改动说明和创建 PR 的链接；
+# - 在 issue / PR 评论里写 @claude → Claude 按评论继续修改或回答。
+# 需要仓库 Secrets 里有 CLAUDE_CODE_OAUTH_TOKEN 或 ANTHROPIC_API_KEY（见 README）。
+# GitHub 只运行默认分支（main）上的这个文件，合并到 main 后才生效。
+name: Claude
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+  actions: read
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: >-
+      (github.event_name == 'issues' && github.event.label.name == 'claude') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 让 Claude 能在提交前跑 npm run build 验证（CLAUDE.md 要求）
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          label_trigger: claude
+          base_branch: experimental
+          branch_prefix: claude/
+          claude_args: --allowedTools "Bash(npm run build),Bash(npm run typecheck)"

@@ -104,6 +104,29 @@ npm run deploy:preview   # 实验预览版
    - 应用的 Audience (AUD) Tag
 3. 把这两个值填入 `wrangler.jsonc` 中 `vars` 和 `previews.vars` 的 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`，提交后自动部署生效。预览网址如果是单独的 Access 应用，`previews.vars` 填它自己的 AUD。
 
+### 批注转为 GitHub issue，由 Claude 修改
+
+需要改 SOP 的批注，在批注卡片上点「转为 issue」。这样会在本仓库开一个 issue，内容包括页面、源文件路径、引用的原文和上下文，以及批注和全部回复。署名只用邮箱 `@` 前面的部分。issue 带 `annotation` 和 `claude` 两个标签，GitHub Action（`.github/workflows/claude.yml`）收到 `claude` 标签后，由 Claude 按 issue 修改 SOP。它会从 `experimental` 拉出 `claude/` 分支并提交，然后在 issue 里回复改动说明和「Create PR」链接。点开这个链接，就能创建合并到 `experimental` 的 PR。
+
+- 不想让 Claude 自动处理时，从 `GITHUB_ISSUE_LABELS` 里去掉 `claude`，以后需要时再给 issue 手动加上这个标签。
+- 在 issue 或 PR 评论里写 `@claude` 加说明，可以让 Claude 继续修改。批注原文里的 `@` 会被转义，不会触发 Claude。
+- 一条批注只能转一次。转过之后，卡片上会显示 issue 链接。
+
+一次性配置：
+
+1. **GitHub token（给 Worker 建 issue 用）**：GitHub → Settings → Developer settings → Fine-grained tokens，仓库只选本仓库，权限选 Issues: Read and write。然后设置成 Worker 密钥，正式版和预览版都要设置：
+
+   ```bash
+   npx wrangler secret put GITHUB_TOKEN                      # 正式版
+   npx wrangler preview base-config secret put GITHUB_TOKEN  # 之后新建的 Preview
+   npx wrangler preview secret put GITHUB_TOKEN --name experimental  # 已存在的 experimental Preview
+   ```
+
+   没有设置时不显示「转为 issue」按钮。仓库和标签在 `wrangler.jsonc` 的 `vars` 和 `previews.vars` 里配置（`GITHUB_REPO`、`GITHUB_ISSUE_LABELS`）。
+2. **Claude 的凭据**：在本地 Claude Code 里运行 `/install-github-app`，按提示安装 Claude GitHub App，并生成 `CLAUDE_CODE_OAUTH_TOKEN`（使用订阅额度）。也可以在仓库 Settings → Secrets and variables → Actions 里手动添加 `ANTHROPIC_API_KEY`（按 API 用量计费）。二选一即可。
+3. workflow 只在合并到 `main` 后生效（GitHub 只运行默认分支上的 issue 类 workflow）。
+4. 建议在仓库 Settings → General 里勾选「Automatically delete head branches」。这样 PR 合并后会自动删除 `claude/` 分支，Cloudflare 上对应的 Preview 也会一并清理。
+
 ### 本地调试
 
 ```bash

@@ -20,3 +20,14 @@
   - 上传静态资源时 `assets-upload-session` 报 `An unknown error has occurred [code: 10013]`：Cloudflare 侧临时故障（2026-10-27 遇到过，重试即通过）。不要改代码，请用户在控制台 Retry build 一次。
 - 看构建日志时先核对时间戳和分支名，确认是不是本次 PR 的构建。
 - 只改文档内容（`src/content/docs/`、`src/assets/`）的 PR 若预览检查失败，先在 PR 里说明本地构建已通过，再请用户查看控制台日志。
+
+## 处理批注 issue（标签 `annotation`）
+
+这类 issue 由网站批注「转为 issue」生成（`worker/issues.ts`），正文里有页面、源文件路径、批注的原文和上下文、批注及回复。处理规则：
+
+- 只改 issue 指向的那份 SOP，用上下文里【】内的文字定位，改动尽量小。不要顺手改其他段落。
+- 批注要求的数值、条件、试剂，如果在 issue 里找不到明确依据，**不要自己编**。在 issue 里回复说明缺什么信息，或者在正文用 `:::caution` 标注「待确认」。
+- 批注只是提问或讨论、不需要改文档时，在 issue 里回答，不要提交改动。
+- 内容有实质修改时，把 SOP 表格里的「版本」小版本号加一（如 v0.2 → v0.3）。
+- 提交前运行 `npm run build`，构建必须通过。分支从 `experimental` 拉出，PR 也合并到 `experimental`。
+- commit 信息写明改了什么，并引用 issue 编号（如 `Fixes #12`）。
