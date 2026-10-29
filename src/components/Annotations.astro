@@ -1,5 +1,6 @@
 ---
 // 批注：在正文中选中文字即可添加批注，右侧面板显示讨论、回复和解决状态。
+// 页面公开，批注只对登录用户显示：未登录时面板里给出「登录」按钮（/api/login，受 Access 保护）。
 // 数据由 Worker 的 /api/annotations 提供（worker/annotations.ts）；接口不可用时
 // （例如 astro dev）整个功能不显示。
 // 「转为 issue」把一条批注发到 GitHub（worker/issues.ts），issue 里带上源文件路径。
@@ -265,10 +266,13 @@ const { entry } = Astro.locals.starlightRoute;
 
   function signInNotice() {
     if (me.user) return null;
+    if (!me.authConfigured) return h('p', { class: 'anno-notice' }, '批注需要先开启 Cloudflare Access 登录。');
+    const back = location.pathname + location.search + location.hash;
     return h(
-      'p',
+      'div',
       { class: 'anno-notice' },
-      me.authConfigured ? '登录后可以添加和回复批注。' : '批注需要先开启 Cloudflare Access 登录，目前只能查看。',
+      h('p', {}, '组内成员登录后可以查看和添加批注。'),
+      h('a', { class: 'anno-btn is-primary', href: `/api/login?return=${encodeURIComponent(back)}` }, '登录'),
     );
   }
 
@@ -433,7 +437,7 @@ const { entry } = Astro.locals.starlightRoute;
         signInNotice(),
         composer(),
         ...list.map(card),
-        !pending && list.length === 0 ? h('p', { class: 'anno-empty' }, me.user ? '在正文中选中文字，即可添加批注。' : '暂无批注。') : null,
+        me.user && !pending && list.length === 0 ? h('p', { class: 'anno-empty' }, '在正文中选中文字，即可添加批注。') : null,
       ),
     );
   }
@@ -450,7 +454,8 @@ const { entry } = Astro.locals.starlightRoute;
   async function init() {
     if (!root) return;
     try {
-      [me, { threads }] = await Promise.all([api<Me>('/api/me'), api<{ threads: Thread[] }>(`/api/annotations?page=${encodeURIComponent(page)}`)]);
+      me = await api<Me>('/api/me');
+      if (me.user) ({ threads } = await api<{ threads: Thread[] }>(`/api/annotations?page=${encodeURIComponent(page)}`));
     } catch {
       return; // no API here (e.g. astro dev): annotations stay off
     }
@@ -615,6 +620,13 @@ const { entry } = Astro.locals.starlightRoute;
     margin: 0;
     font-size: 0.8125rem;
     color: var(--sl-color-gray-3);
+  }
+  .anno-notice p {
+    margin: 0 0 0.6rem;
+  }
+  .anno-notice .anno-btn {
+    display: inline-block;
+    text-decoration: none;
   }
   .anno-notice {
     padding: 0.6rem 0.8rem;

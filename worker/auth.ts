@@ -1,6 +1,9 @@
-// Identity comes from Cloudflare Access: every request that passed Access
-// carries a signed JWT in the Cf-Access-Jwt-Assertion header. The email in it
-// is trusted only after the signature, audience, issuer and expiry check out.
+// Identity comes from Cloudflare Access. The site itself is public; Access
+// guards only /api/login (and whole Preview hosts). A request through Access
+// carries the signed JWT in the Cf-Access-Jwt-Assertion header; after sign-in
+// the same JWT sits in the CF_Authorization cookie, scoped to the whole host,
+// so every other page is recognised too. The email is trusted only after the
+// signature, audience, issuer and expiry check out.
 // Without ACCESS_TEAM_DOMAIN / ACCESS_AUD nobody is signed in (fail closed).
 import type { Env } from './http';
 
@@ -33,11 +36,21 @@ interface AccessClaims {
 
 export const authConfigured = (env: Env) => !!(env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD);
 
+/** ACCESS_AUD may list several Access applications, comma-separated. */
+const audiences = (env: Env) => env.ACCESS_AUD!.split(',').map((a) => a.trim()).filter(Boolean);
+
+function accessToken(req: Request): string | null {
+  const header = req.headers.get('Cf-Access-Jwt-Assertion');
+  if (header) return header;
+  const m = /(?:^|;\s*)CF_Authorization=([^;]+)/.exec(req.headers.get('Cookie') ?? '');
+  return m ? m[1] : null;
+}
+
 /** The signed-in user's email, or null. */
 export async function userOf(req: Request, env: Env): Promise<string | null> {
   if (env.DEV_USER) return env.DEV_USER;
   if (!authConfigured(env)) return null;
-  const token = req.headers.get('Cf-Access-Jwt-Assertion');
+  const token = accessToken(req);
   if (!token) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
@@ -55,7 +68,7 @@ export async function userOf(req: Request, env: Env): Promise<string | null> {
     const claims = decodeJson<AccessClaims>(parts[1]);
     const now = Date.now() / 1000;
     const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-    if (!aud.includes(env.ACCESS_AUD!) || claims.iss !== `https://${team}` || claims.exp < now || (claims.nbf ?? 0) > now + 60) return null;
+    if (!aud.some((a) => audiences(env).includes(a)) || claims.iss !== `https://${team}` || claims.exp < now || (claims.nbf ?? 0) > now + 60) return null;
     return claims.email ?? null;
   } catch (e) {
     console.error('access jwt', e);

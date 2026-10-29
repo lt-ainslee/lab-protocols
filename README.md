@@ -92,17 +92,23 @@ npm run deploy:preview   # 实验预览版
 
 - 接口：Worker（`worker/`）提供 `/api/annotations`，其余请求返回静态页面。
 - 数据：存放在 D1 数据库，正式版用 `lab-protocols-db`，预览版用 `lab-protocols-db-preview`，互不影响。数据表由 Worker 自动创建（`worker/schema.ts`）。
-- 身份：通过 Cloudflare Access 登录，批注署名为登录邮箱。Worker 会校验 Access 签发的令牌，不信任任何可伪造的请求头。
+- 身份：SOP 页面公开，不登录也能看；批注只对登录用户显示。批注面板里的「登录」按钮跳到 `/api/login`，这个路径受 Cloudflare Access 保护，登录后回到原页面。Access 留下的 `CF_Authorization` cookie 作用于整个域名，Worker 校验其中的令牌（签名、AUD、签发方、有效期），批注署名为登录邮箱。
+- 安全：写操作只接受本站页面发出的请求（校验 `Origin`），防止别的网站借用登录 cookie。
 
 ### 开启 Cloudflare Access
 
-未开启前，所有人都只能查看批注，不能添加。
+正式版只保护登录路径，预览版整站保护：
 
-1. Cloudflare 控制台 → Workers & Pages → `lab-protocols` → Settings → Domains & Routes，在 workers.dev 和 Preview URLs 上开启 Cloudflare Access，并设置允许登录的邮箱（如课题组成员的邮箱）。
-2. 在 Zero Trust → Access → Applications 中打开对应的应用，记下：
-   - 团队域名（Team domain），形如 `xxx.cloudflareaccess.com`
-   - 应用的 Audience (AUD) Tag
-3. 把这两个值填入 `wrangler.jsonc` 中 `vars` 和 `previews.vars` 的 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`，提交后自动部署生效。预览网址如果是单独的 Access 应用，`previews.vars` 填它自己的 AUD。
+1. **正式版**：Zero Trust → Access → Applications → Add an application → **Self-hosted**，在同一个应用里添加两个目标，路径都填 `api/login`：
+   - `lab-protocols.ainslee-lt.cn/api/login`
+   - `lab-protocols.litao2235466690.workers.dev/api/login`
+
+   策略选 **Allow**，Include → Emails ending in → `@ainslee-lt.cn`。登录方式开启 One-time PIN。应用设置里**不要开启 Cookie Path Attribute**，否则登录 cookie 只在 `/api/login` 下有效，其他页面认不出登录身份。
+2. **预览版**：Workers & Pages → `lab-protocols` → Settings → Domains & Routes，在 Preview URLs 上开启 Cloudflare Access（Worker Access「Previews only」），整个预览网址都要求登录。
+3. 在两个应用里分别记下 Audience (AUD) Tag。团队域名为 `ainslee-lt.cloudflareaccess.com`。
+4. 填入 `wrangler.jsonc` 的 `vars` 和 `previews.vars`：`ACCESS_TEAM_DOMAIN` 填团队域名，`ACCESS_AUD` 填 AUD，多个应用用逗号分隔。提交后自动部署生效。
+
+检查：无痕窗口打开网站应能直接浏览；点「批注」→「登录」应跳到 Access 登录页，登录后 `/api/me` 显示自己的邮箱。如果点「登录」后提示「登录未配置」，说明这个域名的 `/api/login` 没有被 Access 保护。
 
 ### 批注转为 GitHub issue，由 Claude 修改
 
