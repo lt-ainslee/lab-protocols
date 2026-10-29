@@ -28,7 +28,7 @@
   // GITHUB_*：批注「转为 issue」发到的仓库和标签；还需要 GITHUB_TOKEN 密钥（见 README），未设置时不显示按钮。
   "vars": {
     "ACCESS_TEAM_DOMAIN": "ainslee-lt.cloudflareaccess.com",
-    "ACCESS_AUD": "b920cd8c6a1639cb781b8d6d764e983c3ead715aae6a931e7d686a1c22b6bc3e",
+    "ACCESS_AUD": "b920cd8c6a1639cb781b8d6d764e983c3ead715aae6a931e7d686a1c22b6bc3e,618295bd5574c37a3d9450984cff606bf15fa8349fd67b80b9875ed594258f12",
     "GITHUB_REPO": "lt-ainslee/lab-protocols",
     "GITHUB_ISSUE_LABELS": "annotation,claude",
     "SITE_ENV": "production"
@@ -49,7 +49,7 @@
     ],
     "vars": {
       "ACCESS_TEAM_DOMAIN": "ainslee-lt.cloudflareaccess.com",
-      "ACCESS_AUD": "b920cd8c6a1639cb781b8d6d764e983c3ead715aae6a931e7d686a1c22b6bc3e",
+      "ACCESS_AUD": "b920cd8c6a1639cb781b8d6d764e983c3ead715aae6a931e7d686a1c22b6bc3e,618295bd5574c37a3d9450984cff606bf15fa8349fd67b80b9875ed594258f12",
       "GITHUB_REPO": "lt-ainslee/lab-protocols",
       "GITHUB_ISSUE_LABELS": "annotation,claude",
       "SITE_ENV": "preview"
