@@ -1,5 +1,6 @@
 // /api/annotations: comment threads anchored to quoted text on a page.
 //   GET    /api/annotations?page=/synthesis/x/   threads (with replies) on a page
+// Everything here needs a signed-in user: the pages are public, the discussion is not.
 //   POST   /api/annotations                      new thread {page, quote, prefix, suffix, body}
 //   POST   /api/annotations/:id/replies          reply {body}
 //   PATCH  /api/annotations/:id                  {resolved: boolean} (threads only)
@@ -69,6 +70,9 @@ export async function handleAnnotations(req: Request, env: Env, path: string): P
   const db = env.DB;
   const id = parts[2];
   if (id !== undefined && !ID_RE.test(id)) return error(404, 'not_found');
+  const user = await userOf(req, env);
+  if (!user) return error(401, 'sign_in_required');
+  const now = Date.now();
 
   if (req.method === 'GET' && !id) {
     const page = new URL(req.url).searchParams.get('page');
@@ -79,10 +83,6 @@ export async function handleAnnotations(req: Request, env: Env, path: string): P
       .all<Row>();
     return json({ threads: threads(results) });
   }
-
-  const user = await userOf(req, env);
-  if (!user) return error(401, 'sign_in_required');
-  const now = Date.now();
 
   if (req.method === 'POST' && !id) {
     const b = await readBody(req);
