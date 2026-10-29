@@ -90,7 +90,7 @@ const { entry } = Astro.locals.starlightRoute;
       headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
       credentials: 'same-origin',
     });
-    if (!res.ok) throw new Error(`${res.status}`);
+    if (!res.ok) throw Object.assign(new Error(`${res.status}`), { body: await res.json().catch(() => null) });
     return (res.status === 204 ? null : await res.json()) as T;
   }
 
@@ -249,6 +249,17 @@ const { entry } = Astro.locals.starlightRoute;
       await task();
     } catch (e) {
       const code = (e as Error).message;
+      const gh = (e as { body?: { error?: string; status?: number; message?: string } }).body;
+      if (gh?.error === 'github_error') {
+        const hint: Record<number, string> = {
+          401: 'GitHub token 无效或已过期，请在 Cloudflare 里更新 GITHUB_TOKEN。',
+          403: 'GitHub token 权限不足：需要本仓库的 Issues: Read and write。',
+          404: 'GitHub token 访问不到仓库：检查 token 的 Repository access 是否选了本仓库。',
+          422: 'GitHub 拒绝了 issue 内容（常见于标签问题）。',
+        };
+        alert(`转为 issue 失败：GitHub 返回 HTTP ${gh.status}\n${gh.message ?? ''}\n\n${hint[gh.status ?? 0] ?? ''}`.trim());
+        return;
+      }
       alert(
         code === '401'
           ? '请先登录后再操作。'

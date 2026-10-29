@@ -24,6 +24,16 @@ export interface IssueReply {
 
 export const issuesConfigured = (env: Env) => !!(env.GITHUB_TOKEN && env.GITHUB_REPO);
 
+/** GitHub refused the request; status and message are shown to the user to fix the token. */
+export class GitHubError extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string,
+  ) {
+    super(`github issues: HTTP ${status} ${detail}`);
+  }
+}
+
 const SOURCE_RE = /^src\/content\/docs\/[\w./-]+\.mdx?$/;
 const shortName = (email: string) => email.split('@')[0];
 const fmtTime = (t: number) =>
@@ -90,7 +100,18 @@ export async function createIssue(env: Env, content: { title: string; body: stri
     },
     body: JSON.stringify({ ...content, labels }),
   });
-  if (!res.ok) throw new Error(`github issues: HTTP ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text.slice(0, 300);
+    try {
+      const b = JSON.parse(text) as { message?: string; errors?: { message?: string; field?: string; code?: string }[] };
+      const more = (b.errors ?? []).map((e) => e.message ?? [e.field, e.code].filter(Boolean).join(' ')).filter(Boolean);
+      detail = [b.message, ...more].filter(Boolean).join('; ') || detail;
+    } catch {
+      // not JSON: keep the raw text
+    }
+    throw new GitHubError(res.status, detail);
+  }
   const issue = (await res.json()) as { number: number; html_url: string };
   return { number: issue.number, url: issue.html_url };
 }

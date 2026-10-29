@@ -8,7 +8,7 @@
 //   POST   /api/annotations/:id/issue            turn a thread into a GitHub issue {title, source}
 import { userOf } from './auth';
 import { error, json, type Env } from './http';
-import { createIssue, issueContent, issuesConfigured } from './issues';
+import { createIssue, GitHubError, issueContent, issuesConfigured } from './issues';
 
 interface Row {
   id: string;
@@ -146,7 +146,14 @@ export async function handleAnnotations(req: Request, env: Env, path: string): P
       by: user,
       preview: env.SITE_ENV === 'preview',
     });
-    const issue = await createIssue(env, content);
+    let issue;
+    try {
+      issue = await createIssue(env, content);
+    } catch (e) {
+      if (!(e instanceof GitHubError)) throw e;
+      console.error(e.message);
+      return error(502, 'github_error', { status: e.status, message: e.detail });
+    }
     await db
       .prepare('UPDATE annotations SET issue_number = ?, issue_url = ?, updated_at = ? WHERE id = ?')
       .bind(issue.number, issue.url, now, id)
