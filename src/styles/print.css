@@ -1,0 +1,85 @@
+/* 打印 / 导出 PDF：只保留标题和正文，沿用网页的浅色样式
+   （打印前 Export.astro 会切到浅色主题并展开折叠内容） */
+
+@page {
+  size: A4;
+  margin: 18mm 17mm 20mm;
+}
+
+@media print {
+  :root {
+    --sl-text-body: 10.5pt;
+    --sl-text-h1: 22pt;
+    --sl-text-h2: 15pt;
+    --sl-text-h3: 12.5pt;
+    --sl-line-height: 1.75;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  html,
+  body {
+    background: #fff;
+  }
+
+  /* 去掉页眉、侧边栏、目录、翻页、批注等界面元素 */
+  header.header,
+  .sidebar,
+  .right-sidebar-container,
+  mobile-starlight-toc,
+  .pagination-links,
+  footer,
+  .sl-anchor-link,
+  [class^='anno-'],
+  .skip-link {
+    display: none !important;
+  }
+  .main-frame {
+    padding: 0 !important;
+  }
+  .content-panel {
+    padding: 0 !important;
+  }
+  .sl-container {
+    max-width: none !important;
+    margin: 0 !important;
+  }
+  .content-panel h1 {
+    margin-top: 0;
+  }
+
+  /* 批注高亮不打印 */
+  mark.anno-mark {
+    background: transparent !important;
+    border-bottom: none !important;
+  }
+
+  /* 分页 */
+  .sl-markdown-content :is(h2, h3, .sl-heading-wrapper) {
+    break-after: avoid;
+  }
+  .sl-markdown-content :is(tr, figure, img, .starlight-aside, details) {
+    break-inside: avoid;
+  }
+  .sl-markdown-content .sl-heading-wrapper.level-h2 {
+    margin-top: 2rem;
+    padding-top: 1.25rem;
+  }
+
+  /* 表格不再横向滚动 */
+  .sl-markdown-content table {
+    display: table !important;
+    white-space: normal !important;
+  }
+
+  /* 标签页：全部展开 */
+  starlight-tabs [role='tablist'] {
+    display: none;
+  }
+  starlight-tabs [role='tabpanel'][hidden] {
+    display: block !important;
+  }
+
+  .sl-markdown-content a {
+    text-decoration: none !important;
+  }
+}
