@@ -40,7 +40,9 @@ const fmtTime = (t: number) =>
   new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'short' }).format(t);
 // Keep "@name" in annotation text from pinging GitHub users or triggering @claude.
 const defuse = (s: string) => s.replace(/@/g, '@​');
-const quoteBlock = (s: string) => s.split('\n').map((l) => `> ${l}`).join('\n');
+// Quotes across table cells or list items come with runs of blank lines; one line break is enough.
+const tidy = (s: string) => s.replace(/[ \t]*\n\s*/g, '\n');
+const quoteBlock = (s: string) => tidy(s).trim().split('\n').map((l) => `> ${l}`).join('\n');
 const oneLine = (s: string, max: number) => {
   const t = s.replace(/\s+/g, ' ').trim();
   return t.length > max ? `${t.slice(0, max)}…` : t;
@@ -67,7 +69,7 @@ export function issueContent(
     '上下文（【】内为批注的文字）：',
     '',
     '````text',
-    `…${t.prefix}【${t.quote}】${t.suffix}…`,
+    tidy(`…${t.prefix}【${t.quote}】${t.suffix}…`),
     '````',
     '',
     '### 批注',
@@ -77,7 +79,8 @@ export function issueContent(
     '',
     '---',
     '',
-    '带 `claude` 标签的 issue 会由 Claude 修改对应 SOP 并推送分支；也可以在评论里 `@claude` 补充说明。不需要改动的话直接关闭。',
+    // No literal "@claude" here: the Claude action takes the text after it as the request.
+    '带 claude 标签的 issue 会由 Claude 修改对应 SOP 并推送分支；需要补充说明时，在评论里 @ 它（写成 @ 加 claude，不带空格）。不需要改动的话直接关闭。',
     '',
     `<!-- annotation-id: ${opts.id} -->`,
   ].join('\n');

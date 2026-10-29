@@ -96,15 +96,33 @@ const { entry } = Astro.locals.starlightRoute;
 
   // ---------- text anchoring ----------
 
-  /** Character offset of a DOM point within the content's text. */
-  function textOffset(node: Node, offset: number) {
-    const r = document.createRange();
-    r.setStart(root!, 0);
-    r.setEnd(node, offset);
-    return r.toString().length;
+  // Screen-reader-only text (e.g. Starlight's "Section titled …" on heading anchors) is not
+  // part of what readers see or select, so it stays out of quotes and offsets.
+  const HIDDEN = '.sr-only, .sl-anchor-link';
+
+  function textNodes(): Text[] {
+    const walker = document.createTreeWalker(root!, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (n.parentElement?.closest(HIDDEN) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
+    const nodes: Text[] = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
+    return nodes;
   }
 
-  const fullText = () => root!.textContent ?? '';
+  /** Character offset of a DOM point within the content's visible text. */
+  function textOffset(node: Node, offset: number) {
+    const point = document.createRange();
+    point.setStart(node, offset);
+    let pos = 0;
+    for (const t of textNodes()) {
+      if (t === node) return pos + offset;
+      if (point.comparePoint(t, t.length) > 0) break; // t ends after the point
+      pos += t.length;
+    }
+    return pos;
+  }
+
+  const fullText = () => textNodes().map((t) => t.data).join('');
 
   /** Best match of a thread's quote, using its prefix / suffix to pick among repeats. */
   function locate(t: Pick<Thread, 'quote' | 'prefix' | 'suffix'>): [number, number] | null {
@@ -128,10 +146,9 @@ const { entry } = Astro.locals.starlightRoute;
   }
 
   function wrap(start: number, end: number, id: string, resolved: boolean) {
-    const walker = document.createTreeWalker(root!, NodeFilter.SHOW_TEXT);
     const hits: { node: Text; a: number; b: number }[] = [];
     let pos = 0;
-    for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+    for (const n of textNodes()) {
       const len = n.data.length;
       const a = Math.max(start, pos) - pos;
       const b = Math.min(end, pos + len) - pos;
